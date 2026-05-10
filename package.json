@@ -2,7 +2,6 @@
   "name": "bloom-and-charm-shop",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
@@ -12,11 +11,12 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "devDependencies": {
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.14",
-    "tailwindcss": "^4.2.4"
+    "tailwindcss": "^4.2.4",
+    "vite": "^6.0.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
