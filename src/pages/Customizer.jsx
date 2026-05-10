@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Flower2, Scissors, Paintbrush2, ShoppingBag, Sparkles, ChevronRight, ChevronLeft, Check, Loader2 } from 'lucide-react';
+import { Flower2, Scissors, Paintbrush2, ShoppingBag, Sparkles, ChevronRight, ChevronLeft, Check, Loader2, Key } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { productsService } from '../services/supabaseService';
 
@@ -100,9 +100,9 @@ export default function Customizer() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { id: 'keychain', name: 'Key chains', icon: '🔑', desc: 'Personalized Charms', color: 'bg-blue-100' },
-              { id: 'bouquet', name: 'Bouquets', icon: '🌸', desc: 'Floral Masterpieces', color: 'bg-pink-100' },
-              { id: 'bag', name: 'Bags', icon: '👜', desc: 'Artisan Carriers', color: 'bg-sage-mist/20' }
+              { id: 'keychain', name: 'Key chains', icon: <Key className="w-12 h-12 text-blue-500" />, desc: 'Personalized Charms', color: 'bg-blue-50' },
+              { id: 'bouquet', name: 'Bouquets', icon: <Flower2 className="w-12 h-12 text-pink-500" />, desc: 'Floral Masterpieces', color: 'bg-pink-50' },
+              { id: 'bag', name: 'Bags', icon: <ShoppingBag className="w-12 h-12 text-sage-mist" />, desc: 'Artisan Carriers', color: 'bg-sage-50' }
             ].map((item, idx) => (
               <button
                 key={item.id}
@@ -110,7 +110,7 @@ export default function Customizer() {
                 className="group relative flex flex-col items-center p-8 rounded-[3rem] bg-white border-2 border-transparent hover:border-blossom-pink shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 animate-in fade-in zoom-in duration-700"
                 style={{ animationDelay: `${idx * 150}ms` }}
               >
-                <div className={`w-32 h-32 ${item.color} rounded-full flex items-center justify-center text-6xl mb-6 group-hover:scale-110 transition-transform duration-500 shadow-inner`}>
+                <div className={`w-24 h-24 ${item.color} rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
                   {item.icon}
                 </div>
                 <h3 className="text-2xl font-playfair font-bold text-charcoal-berry mb-2">{item.name}</h3>
