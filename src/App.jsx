@@ -16,6 +16,9 @@ import Orders from './pages/Orders';
 import Customizer from './pages/Customizer';
 import Checkout from './pages/Checkout';
 import ProductDetail from './pages/ProductDetail';
+import Addresses from './pages/Addresses';
+import Payments from './pages/Payments';
+import MyReviews from './pages/MyReviews';
 import AdminRoute from './components/admin/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -57,6 +60,9 @@ function LayoutWrapper() {
         <Route path="/customizer" element={<Customizer />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/addresses" element={<Addresses />} />
+        <Route path="/payment" element={<Payments />} />
+        <Route path="/my-reviews" element={<MyReviews />} />
 
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
           <Route index element={<AdminDashboard />} />

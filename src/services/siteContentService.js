@@ -191,6 +191,17 @@ export const reviewsService = {
     return data || [];
   },
 
+  /** Public/Customer: approved reviews + current user pending reviews for specific product */
+  async getForProduct(productId) {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .eq('product_id', parseInt(productId))
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
   /** Admin: all reviews */
   async getAll() {
     const { data, error } = await supabase
@@ -220,7 +231,7 @@ export const reviewsService = {
   async submit({ product_id, author_name, rating, body }) {
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from('reviews').insert({
-      product_id,
+      product_id: parseInt(product_id),
       user_id: user?.id || null,
       author_name,
       rating,

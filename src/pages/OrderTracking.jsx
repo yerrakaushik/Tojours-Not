@@ -1,33 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, Search, Loader2, Sparkles, ChevronLeft, CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { orderService } from '../services/orderService';
 import TrackingTimeline from '../components/orders/TrackingTimeline';
 
 export default function OrderTracking() {
   const [orderId, setOrderId] = useState('');
+  const [searchParams] = useSearchParams();
   const [trackingData, setTrackingData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleTrack = async (e) => {
-    e.preventDefault();
-    if (!orderId) return;
-
+  const trackOrderById = async (id) => {
+    if (!id) return;
     setLoading(true);
     setError(null);
-
     try {
-      const history = await orderService.getOrderTracking(orderId);
+      const history = await orderService.getOrderTracking(id);
       if (!history || history.length === 0) {
         throw new Error('Order ID not found. Please check and try again.');
       }
       setTrackingData(history);
     } catch (err) {
       setError(err.message || 'An error occurred while tracking your order.');
+      setTrackingData(null);
     } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    const idParam = searchParams.get('id');
+    if (idParam) {
+      setOrderId(idParam);
+      trackOrderById(idParam);
+    }
+  }, [searchParams]);
+
+  const handleTrack = async (e) => {
+    e.preventDefault();
+    trackOrderById(orderId);
   };
 
   return (

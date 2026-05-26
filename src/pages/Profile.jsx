@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Package, MapPin, Heart, CreditCard, LogOut, Sparkles, ChevronRight, Settings, Star, Loader2, Gift, ShieldCheck } from 'lucide-react';
+import { User, Package, MapPin, Heart, CreditCard, LogOut, Sparkles, ChevronRight, Settings, Star, Loader2, Gift, ShieldCheck, MessageSquare } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { profileService } from '../services/profileService';
 import { orderService } from '../services/orderService';
@@ -102,6 +102,7 @@ export default function Profile() {
                 { label: 'Wishlist', icon: Heart, link: '/wishlist', color: 'text-blossom-pink' },
                 { label: 'Addresses', icon: MapPin, link: '/addresses', color: 'text-blue-400' },
                 { label: 'Payments', icon: CreditCard, link: '/payment', color: 'text-purple-400' },
+                { label: 'My Reviews', icon: MessageSquare, link: '/my-reviews', color: 'text-amber-500' },
               ].map((item, i) => (
                 <Link
                   key={i}
@@ -164,7 +165,7 @@ export default function Profile() {
 
               <div className="space-y-4">
                 {orders.length > 0 ? orders.map((order, i) => (
-                  <div key={i} className="flex items-center justify-between p-5 rounded-[1.5rem] bg-white/50 border border-white hover:shadow-lg transition-all hover:scale-[1.01] group cursor-pointer">
+                  <div key={i} onClick={() => navigate(`/track?id=${order.id}`)} className="flex items-center justify-between p-5 rounded-[1.5rem] bg-white/50 border border-white hover:shadow-lg transition-all hover:scale-[1.01] group cursor-pointer">
                     <div className="flex items-center gap-5">
                       <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-pink-50 group-hover:rotate-6 transition-transform">
                         {order.icon || '🌸'}

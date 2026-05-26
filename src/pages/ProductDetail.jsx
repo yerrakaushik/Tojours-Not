@@ -6,6 +6,9 @@ import { useWishlist } from '../context/WishlistContext';
 import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 import { productsService } from '../services/supabaseService';
+import { reviewsService } from '../services/siteContentService';
+import { profileService } from '../services/profileService';
+import toast from 'react-hot-toast';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -344,29 +347,28 @@ export default function ProductDetail() {
 }
 
 function ReviewSection({ productId }) {
-  const [reviews, setReviews] = useState([
-    {
-      id: 1,
-      user: "Sarah M.",
-      rating: 5,
-      date: "2 days ago",
-      content: "Absolutely stunning! The quality of the handmade flowers exceeded my expectations. It was the perfect birthday gift.",
-      verified: true,
-      media: ["https://images.unsplash.com/photo-1526047932273-341f2a7631f9?w=300&q=80"]
-    },
-    {
-      id: 2,
-      user: "James R.",
-      rating: 4,
-      date: "1 week ago",
-      content: "Very beautiful item. Shipping took a bit longer than expected but the artisan quality made up for it.",
-      verified: true,
-      media: []
-    }
-  ]);
-
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
   const [newReview, setNewReview] = useState({ rating: 5, content: '', media: [] });
   const [showForm, setShowForm] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const loadReviews = async () => {
+    setReviewsLoading(true);
+    try {
+      const data = await reviewsService.getForProduct(productId);
+      setReviews(data);
+    } catch (err) {
+      console.error('Failed to load reviews:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReviews();
+  }, [productId]);
 
   const handleMediaUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -384,20 +386,34 @@ function ReviewSection({ productId }) {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const reviewToAdd = {
-      id: Date.now(),
-      user: "Guest Gardener",
-      rating: newReview.rating,
-      date: "Just now",
-      content: newReview.content,
-      verified: false,
-      media: newReview.media.map(m => m.url)
-    };
-    setReviews([reviewToAdd, ...reviews]);
-    setNewReview({ rating: 5, content: '', media: [] });
-    setShowForm(false);
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    try {
+      const profile = await profileService.getProfile();
+      const authorName = profile 
+        ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email.split('@')[0]
+        : user.email.split('@')[0];
+
+      await reviewsService.submit({
+        product_id: productId,
+        author_name: authorName,
+        rating: newReview.rating,
+        body: newReview.content
+      });
+
+      toast.success('Your floral whisper was sent and is awaiting admin approval! ✨');
+      setNewReview({ rating: 5, content: '', media: [] });
+      setShowForm(false);
+      loadReviews();
+    } catch (err) {
+      console.error('Failed to submit review:', err);
+      toast.error('Failed to post review. Please try again.');
+    }
   };
 
   return (
@@ -488,48 +504,60 @@ function ReviewSection({ productId }) {
         </form>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {reviews.map((review) => (
-          <div key={review.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-pink-50 hover:shadow-xl transition-all duration-500">
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-blossom-pink">
-                  <User size={24} />
+      {reviewsLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin text-blossom-pink" size={32} />
+        </div>
+      ) : reviews.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {reviews.map((review) => (
+            <div key={review.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-pink-50 hover:shadow-xl transition-all duration-500">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center text-blossom-pink">
+                    <User size={24} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-charcoal-berry">{review.author_name}</h4>
+                    <p className="text-xs text-charcoal-berry/40 font-medium">
+                      {new Date(review.created_at).toLocaleDateString(undefined, {
+                        year: 'numeric', month: 'short', day: 'numeric'
+                      })}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-charcoal-berry">{review.user}</h4>
-                  <p className="text-xs text-charcoal-berry/40 font-medium">{review.date}</p>
+                
+                <div className="flex flex-col gap-1.5 items-end">
+                  {review.approved ? (
+                    <div className="px-3 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-bold uppercase tracking-widest border border-green-100">
+                      Verified
+                    </div>
+                  ) : (
+                    <div className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold uppercase tracking-widest border border-amber-100">
+                      Awaiting Approval
+                    </div>
+                  )}
                 </div>
               </div>
-              {review.verified && (
-                <div className="px-3 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-bold uppercase tracking-widest border border-green-100">
-                  Verified
-                </div>
-              )}
-            </div>
 
-            <div className="flex text-yellow-400 mb-4">
-              {[1, 2, 3, 4, 5].map(i => (
-                <Star key={i} size={16} fill={i <= review.rating ? 'currentColor' : 'none'} className={i > review.rating ? 'text-gray-200' : ''} />
-              ))}
-            </div>
-
-            <p className="text-charcoal-berry/70 leading-relaxed mb-6 font-medium">
-              {review.content}
-            </p>
-
-            {review.media && review.media.length > 0 && (
-              <div className="flex flex-wrap gap-3">
-                {review.media.map((url, i) => (
-                  <div key={i} className="w-20 h-20 rounded-xl overflow-hidden shadow-sm cursor-pointer hover:scale-105 transition-transform bg-creamy-vanilla">
-                    <img src={url} alt="Review media" className="w-full h-full object-cover" />
-                  </div>
+              <div className="flex text-yellow-400 mb-4">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Star key={i} size={16} fill={i <= review.rating ? 'currentColor' : 'none'} className={i > review.rating ? 'text-gray-200' : ''} />
                 ))}
               </div>
-            )}
-          </div>
-        ))}
-      </div>
+
+              <p className="text-charcoal-berry/70 leading-relaxed font-medium">
+                "{review.body}"
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-16 bg-white/30 rounded-[3rem] border border-dashed border-pink-200">
+          <Star className="w-12 h-12 text-pink-200 mx-auto mb-4" />
+          <p className="text-gray-500 font-bold">No whispers yet. Be the first to share your thoughts!</p>
+        </div>
+      )}
     </section>
   );
 }
