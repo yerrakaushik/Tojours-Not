@@ -147,7 +147,7 @@ export default function Orders() {
                     <h3 className="text-xs font-black uppercase tracking-widest text-charcoal-berry/40">Items Ordered ({order.order_items?.length || 0})</h3>
                     <button 
                       onClick={(e) => toggleOrderExpand(order.id, e)}
-                      className="flex items-center gap-1 text-xs font-bold text-blossom-pink hover:text-pink-600 transition-colors"
+                      className="flex items-center gap-1 text-xs font-bold text-pink-600 hover:text-pink-700 transition-colors"
                     >
                       {isExpanded ? (
                         <>Hide Items <ChevronUp size={14} /></>
@@ -178,7 +178,7 @@ export default function Orders() {
                           <div className="flex gap-2 w-full sm:w-auto">
                             <button
                               onClick={(e) => handleBuyItAgain(item, e)}
-                              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-pink-50 hover:bg-pink-100 text-blossom-pink rounded-xl text-xs font-bold transition-all hover:scale-[1.02]"
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-pink-50 hover:bg-pink-100 text-pink-600 hover:text-pink-700 rounded-xl text-xs font-bold transition-all hover:scale-[1.02]"
                             >
                               <RefreshCw size={12} /> Buy Again
                             </button>

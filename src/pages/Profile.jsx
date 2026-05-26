@@ -5,6 +5,7 @@ import { profileService } from '../services/profileService';
 import { orderService } from '../services/orderService';
 import { authService } from '../services/authService';
 import { formatCurrency } from '../utils/currency';
+import toast from 'react-hot-toast';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -42,6 +43,33 @@ export default function Profile() {
 
   const handleEditProfile = () => {
     navigate('/profile/edit');
+  };
+
+  const handleShareReferral = async () => {
+    if (!user) return;
+    const referralLink = `${window.location.origin}/auth?ref=${user.id}`;
+    const shareData = {
+      title: "Toujours Knot Referral",
+      text: `🌸 Join Toujours Knot and get 500 Magic Points! ✨`,
+      url: referralLink,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(referralLink);
+        toast.success('Your magical referral link has been copied to your clipboard! 🌸');
+      }
+    } catch (err) {
+      console.warn('Share failed:', err);
+      try {
+        await navigator.clipboard.writeText(referralLink);
+        toast.success('Referral link copied to clipboard! 🌸');
+      } catch (clipErr) {
+        toast.error('Could not copy link.');
+      }
+    }
   };
 
   if (loading) {
@@ -211,7 +239,10 @@ export default function Profile() {
                   <p className="text-white/80 max-w-sm mb-6 leading-relaxed">
                     Refer your flower-loving friends and earn <span className="font-bold text-white">500 Magic Points</span> each once they make their first artisan purchase.
                   </p>
-                  <button className="bg-white text-blossom-pink px-8 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-pink-900/20 hover:-translate-y-1 transition-all active:scale-95">
+                  <button 
+                    onClick={handleShareReferral}
+                    className="bg-white text-pink-600 px-8 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-pink-900/20 hover:-translate-y-1 transition-all active:scale-95"
+                  >
                     Share the Love
                   </button>
                 </div>
