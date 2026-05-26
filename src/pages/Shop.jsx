@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, ShoppingBag, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { productsService } from '../services/supabaseService';
+import { formatCurrency } from '../utils/currency';
+
+import { useAuth } from '../context/AuthContext';
 
 export default function Shop() {
   const [activeCategory, setActiveCategory] = useState('ALL');
@@ -12,6 +15,26 @@ export default function Shop() {
   const [addingId, setAddingId] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Sync searchQuery when URL changes
+  useEffect(() => {
+    setSearchQuery(searchParams.get('search') || '');
+  }, [searchParams]);
+
+  // Update URL when searchQuery changes
+  const handleSearchChange = (val) => {
+    setSearchQuery(val);
+    if (val) {
+      setSearchParams({ search: val });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   const CATEGORIES = [
     { id: 'ALL', name: 'All', icon: '✨' },
@@ -30,14 +53,29 @@ export default function Shop() {
   }, []);
 
   const handleAddToCart = (product) => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
     setAddingId(product.id);
     addToCart(product);
     setTimeout(() => setAddingId(null), 2000);
   };
 
-  const filteredProducts = activeCategory === 'ALL'
-    ? products
-    : products.filter(p => p.category === activeCategory);
+  const handleToggleWishlist = (e, product) => {
+    e.preventDefault();
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    toggleWishlist(product);
+  };
+
+  const filteredProducts = products.filter(p => {
+    const matchesCategory = activeCategory === 'ALL' || p.category === activeCategory;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   if (loading) {
     return (
@@ -59,9 +97,31 @@ export default function Shop() {
         <h1 className="text-4xl md:text-6xl font-playfair font-bold text-charcoal-berry mb-4 tracking-tight">
           Curated Charms
         </h1>
-        <p className="text-charcoal-berry/60 max-w-lg text-lg">
+        <p className="text-charcoal-berry/60 max-w-lg text-lg mb-8">
           Discover our handpicked selection of whimsical gifts, from floral whispers to tiny treasures.
         </p>
+
+        {/* Search Bar */}
+        <div className="relative w-full max-w-md group">
+          <input 
+            type="text" 
+            placeholder="Search for magic..." 
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full px-8 py-4 rounded-3xl bg-white border-2 border-pink-50 focus:border-blossom-pink outline-none transition-all duration-300 shadow-sm focus:shadow-xl text-charcoal-berry font-medium pl-14"
+          />
+          <div className="absolute left-6 top-1/2 -translate-y-1/2 text-charcoal-berry/30 group-focus-within:text-blossom-pink transition-colors">
+            <Sparkles size={20} />
+          </div>
+          {searchQuery && (
+            <button 
+              onClick={() => handleSearchChange('')}
+              className="absolute right-6 top-1/2 -translate-y-1/2 text-charcoal-berry/30 hover:text-charcoal-berry transition-colors"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-center mb-16">
@@ -84,21 +144,22 @@ export default function Shop() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
-        {filteredProducts.map(product => (
-          <div key={product.id} className="group relative flex flex-col bg-white rounded-[2.5rem] p-4 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 border border-transparent hover:border-pink-100 shadow-sm">
-            <div className="relative aspect-[4/5] rounded-[2rem] overflow-hidden bg-pink-50 mb-6">
-              <Link to={`/product/${product.id}`} className="block h-full w-full">
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                />
-              </Link>
+        {filteredProducts.map(product => {
+          return (
+            <div key={product.id} className="group relative flex flex-col bg-white rounded-[2.5rem] p-4 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 border border-transparent hover:border-pink-100 shadow-sm">
+              <div className="relative aspect-[4/5] rounded-[2rem] overflow-hidden bg-pink-50 mb-6">
+                <Link to={`/product/${product.id}`} className="block h-full w-full">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                  />
+                </Link>
               <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               
               <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-4 group-hover:translate-x-0 z-10">
                 <button 
-                  onClick={() => toggleWishlist(product)}
+                  onClick={(e) => handleToggleWishlist(e, product)}
                   className={`p-3 rounded-full shadow-lg transition-all hover:scale-110 active:scale-90 ${
                     isInWishlist(product.id)
                       ? 'bg-blossom-pink text-white'
@@ -109,15 +170,7 @@ export default function Shop() {
                 </button>
               </div>
 
-              <div className="absolute bottom-4 left-4 z-10">
-                <span className={`text-[10px] font-bold px-3 py-2 rounded-xl uppercase tracking-wider backdrop-blur-md ${
-                  product.cod
-                  ? 'bg-green-500/80 text-white'
-                  : 'bg-charcoal-berry/60 text-white'
-                }`}>
-                  {product.cod ? 'COD Available' : 'Prepaid Only'}
-                </span>
-              </div>
+
 
               {addingId === product.id && (
                 <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-300 z-20">
@@ -137,8 +190,10 @@ export default function Shop() {
                 </Link>
               </div>
               <div className="flex items-baseline gap-3 mb-6">
-                <span className="text-2xl font-bold text-charcoal-berry">${product.price}</span>
-                <span className="text-sm text-charcoal-berry/30 line-through tracking-tighter decoration-blossom-pink/40">${(product.price * 1.2).toFixed(0)}</span>
+                <span className="text-2xl font-bold text-charcoal-berry">{formatCurrency(product.price)}</span>
+                <span className="text-sm text-charcoal-berry/30 line-through tracking-tighter decoration-blossom-pink/40">
+                  {formatCurrency((product.price * 1.2).toFixed(0))}
+                </span>
               </div>
               <button 
                 onClick={() => handleAddToCart(product)}
@@ -157,8 +212,9 @@ export default function Shop() {
                 )}
               </button>
             </div>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {filteredProducts.length === 0 && (

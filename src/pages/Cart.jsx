@@ -1,7 +1,8 @@
 import React from 'react';
 import { useCart } from '../context/CartContext';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Music } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { formatCurrency } from '../utils/currency';
 
 export default function Cart() {
   const { cart, removeFromCart, updateQuantity, totalPrice, totalItems } = useCart();
@@ -71,6 +72,11 @@ export default function Cart() {
                           📜 {item.customization.wrapping}
                         </span>
                       )}
+                      {item.customization.voiceMessage && (
+                        <span className="text-[10px] bg-blue-100 px-3 py-1 rounded-full text-blue-600 font-bold border border-blue-200 flex items-center gap-1 animate-pulse">
+                          <Music size={12} /> Voice Message Attached
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -100,7 +106,7 @@ export default function Cart() {
                 </div>
 
                 <div className="text-xl font-bold text-charcoal-berry">
-                  ${(item.price * item.quantity).toFixed(2)}
+                  {formatCurrency(item.price * item.quantity)}
                 </div>
               </div>
             ))}
@@ -114,7 +120,7 @@ export default function Cart() {
               <div className="flex flex-col gap-4 mb-6">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>${totalPrice.toFixed(2)}</span>
+                  <span>{formatCurrency(totalPrice)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
@@ -122,7 +128,7 @@ export default function Cart() {
                 </div>
                 <div className="border-t border-pink-50 pt-4 flex justify-between text-xl font-bold text-charcoal-berry">
                   <span>Total</span>
-                  <span>${totalPrice.toFixed(2)}</span>
+                  <span>{formatCurrency(totalPrice)}</span>
                 </div>
               </div>
 
@@ -141,3 +147,4 @@ export default function Cart() {
     </div>
   );
 }
+

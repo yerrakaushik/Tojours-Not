@@ -1,17 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Flower2, Scissors, Paintbrush2, ShoppingBag, Sparkles, ChevronRight, ChevronLeft, Check, Loader2, Key } from 'lucide-react';
+import { Flower2, Paintbrush2, ShoppingBag, Sparkles, ChevronRight, ChevronLeft, Check, Loader2, Key } from 'lucide-react';
+import BouquetCustomizer from '../components/customizer/BouquetCustomizer';
+import KeychainCustomizer from '../components/customizer/KeychainCustomizer';
+import BagCustomizer from '../components/customizer/BagCustomizer';
 import { useCart } from '../context/CartContext';
 import { productsService } from '../services/supabaseService';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { formatCurrency } from '../utils/currency';
+
 
 export default function Customizer() {
   const [customType, setCustomType] = useState(null); // 'bouquet', 'hamper', 'gift'
   const [step, setStep] = useState(1);
-  const [options, setOptions] = useState({ flowers: [], fillers: [], wrappings: [] });
+  const [options, setOptions] = useState({ 
+    flowers: [], fillers: [], wrappings: [],
+    charms: [], beads: [], initials: [], tassels: [],
+    bag_colors: [], straps: [], bag_decors: []
+  });
   const [loading, setLoading] = useState(true);
   const [selection, setSelection] = useState({
+    // Bouquet
     flowers: [],
     fillers: [],
     wrapping: null,
+    // Keychain
+    baseCharm: null,
+    addons: [],
+    initial: null,
+    // Bag
+    bagBase: null,
+    strap: null,
+    decorations: []
   });
   const { addToCart } = useCart();
   const [isAdded, setIsAdded] = useState(false);
@@ -19,35 +39,60 @@ export default function Customizer() {
   useEffect(() => {
     async function loadOptions() {
       const data = await productsService.getCustomOptions();
-      const flowers = data.filter(o => o.type === 'flower');
-      const fillers = data.filter(o => o.type === 'filler');
-      const wrappings = data.filter(o => o.type === 'paper');
+      setOptions({ 
+        flowers: data.filter(o => o.type === 'flower'),
+        fillers: data.filter(o => o.type === 'filler'),
+        wrappings: data.filter(o => o.type === 'paper'),
+        charms: data.filter(o => o.type === 'charm'),
+        beads: data.filter(o => o.type === 'bead'),
+        initials: data.filter(o => o.type === 'initial'),
+        tassels: data.filter(o => o.type === 'tassel'),
+        bag_colors: data.filter(o => o.type === 'bag_color'),
+        straps: data.filter(o => o.type === 'strap'),
+        bag_decors: data.filter(o => o.type === 'bag_decor')
+      });
       
-      setOptions({ flowers, fillers, wrappings });
-      
+      const defaultWrappings = data.filter(o => o.type === 'paper');
+      const defaultCharms = data.filter(o => o.type === 'charm');
+      const defaultBags = data.filter(o => o.type === 'bag_color');
+
       // Try to load saved draft
-      const savedDraft = localStorage.getItem('bouquet-draft');
+      const savedDraft = localStorage.getItem(`${customType}-draft`);
       if (savedDraft) {
         setSelection(JSON.parse(savedDraft));
       } else {
-        setSelection(prev => ({ ...prev, wrapping: wrappings[0] }));
+        setSelection(prev => ({ 
+          ...prev, 
+          wrapping: defaultWrappings[0],
+          baseCharm: defaultCharms[0],
+          bagBase: defaultBags[0]
+        }));
       }
       setLoading(false);
     }
     loadOptions();
-  }, []);
+  }, [customType]);
 
   // Save draft on every selection change
   useEffect(() => {
-    if (!loading && customType === 'bouquet') {
-      localStorage.setItem('bouquet-draft', JSON.stringify(selection));
+    if (!loading && customType) {
+      localStorage.setItem(`${customType}-draft`, JSON.stringify(selection));
     }
   }, [selection, loading, customType]);
 
   const calculateTotal = () => {
-    const flowersTotal = selection.flowers.reduce((sum, f) => sum + f.price, 0);
-    const fillersTotal = selection.fillers.reduce((sum, f) => sum + f.price, 0);
-    return flowersTotal + fillersTotal + (selection.wrapping?.price || 0) + 15; // $15 base for labor/box
+    if (customType === 'bouquet') {
+      const flowersTotal = selection.flowers.reduce((sum, f) => sum + f.price, 0);
+      const fillersTotal = selection.fillers.reduce((sum, f) => sum + f.price, 0);
+      return flowersTotal + fillersTotal + (selection.wrapping?.price || 0) + 15;
+    } else if (customType === 'keychain') {
+      const addonsTotal = selection.addons.reduce((sum, a) => sum + a.price, 0);
+      return (selection.baseCharm?.price || 0) + addonsTotal + (selection.initial?.price || 0) + 5;
+    } else if (customType === 'bag') {
+      const decorTotal = selection.decorations.reduce((sum, d) => sum + d.price, 0);
+      return (selection.bagBase?.price || 0) + (selection.strap?.price || 0) + decorTotal + 10;
+    }
+    return 0;
   };
 
   const toggleItem = (item, type) => {
@@ -61,22 +106,40 @@ export default function Customizer() {
     });
   };
 
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
   const handleAddToBag = () => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
     const customItem = {
       id: `custom-${customType}-${Date.now()}`,
       name: `Custom ${customType.charAt(0).toUpperCase() + customType.slice(1)}`,
       price: calculateTotal(),
-      image: customType === 'bouquet' ? '/images/hero.png' : '/images/cat-bouquets.png',
-      customization: customType === 'bouquet' ? {
-        flowers: selection.flowers.map(f => ({ name: f.name, id: f.id })),
-        fillers: selection.fillers.map(f => ({ name: f.name, id: f.id })),
-        wrapping: selection.wrapping?.name
-      } : { type: customType },
+      image: customType === 'bouquet' ? '/images/hero.png' : customType === 'keychain' ? '/images/cat-keychains.png' : '/images/cat-bouquets.png',
+      customization: {
+        type: customType,
+        details: customType === 'bouquet' ? {
+          flowers: selection.flowers.map(f => f.name),
+          fillers: selection.fillers.map(f => f.name),
+          wrapping: selection.wrapping?.name
+        } : customType === 'keychain' ? {
+          base: selection.baseCharm?.name,
+          addons: selection.addons.map(a => a.name),
+          initial: selection.initial?.name
+        } : {
+          base: selection.bagBase?.name,
+          strap: selection.strap?.name,
+          decorations: selection.decorations.map(d => d.name)
+        }
+      },
       isCustom: true
     };
     addToCart(customItem);
     setIsAdded(true);
-    if (customType === 'bouquet') localStorage.removeItem('bouquet-draft');
+    localStorage.removeItem(`${customType}-draft`);
     setTimeout(() => setIsAdded(false), 2000);
   };
 
@@ -89,6 +152,23 @@ export default function Customizer() {
         </div>
       </div>
     );
+  }
+
+  // Redirect to dedicated customizers
+  if (customType === 'bouquet' || customType === 'keychain' || customType === 'bag') {
+    const BackBtn = () => (
+      <div className="pt-4 px-4">
+        <button
+          onClick={() => setCustomType(null)}
+          className="mb-4 flex items-center gap-2 text-charcoal-berry/60 hover:text-blossom-pink transition-colors font-bold text-sm"
+        >
+          <ChevronLeft size={16} /> Back to Selection
+        </button>
+      </div>
+    );
+    if (customType === 'bouquet') return (<div><BackBtn /><BouquetCustomizer /></div>);
+    if (customType === 'keychain') return (<div><BackBtn /><KeychainCustomizer /></div>);
+    if (customType === 'bag') return (<div><BackBtn /><BagCustomizer /></div>);
   }
 
   if (!customType) {
@@ -106,7 +186,10 @@ export default function Customizer() {
             ].map((item, idx) => (
               <button
                 key={item.id}
-                onClick={() => setCustomType(item.id)}
+                onClick={() => {
+                    setCustomType(item.id);
+                    setStep(1);
+                }}
                 className="group relative flex flex-col items-center p-8 rounded-[3rem] bg-white border-2 border-transparent hover:border-blossom-pink shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 animate-in fade-in zoom-in duration-700"
                 style={{ animationDelay: `${idx * 150}ms` }}
               >
@@ -134,15 +217,19 @@ export default function Customizer() {
       </button>
 
       <div className="max-w-6xl mx-auto">
-        {customType === 'bouquet' ? (
-          <>
-            <div className="flex flex-col items-center text-center mb-12">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sage-mist/10 text-sage-mist text-xs font-bold uppercase tracking-widest mb-4">
-                <Paintbrush2 size={12} /> Design Your Dream
-              </div>
-              <h1 className="text-4xl md:text-5xl font-playfair font-bold text-charcoal-berry mb-2">Bouquet Builder</h1>
-              <p className="text-charcoal-berry/60">Craft a unique floral story, petal by petal.</p>
-            </div>
+        <div className="flex flex-col items-center text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sage-mist/10 text-sage-mist text-xs font-bold uppercase tracking-widest mb-4">
+            <Paintbrush2 size={12} /> Design Your Dream
+          </div>
+          <h1 className="text-4xl md:text-5xl font-playfair font-bold text-charcoal-berry mb-2">
+            {customType === 'bouquet' ? 'Bouquet Builder' : customType === 'keychain' ? 'Keychain Studio' : 'Artisan Bag Workshop'}
+          </h1>
+          <p className="text-charcoal-berry/60">
+            {customType === 'bouquet' ? 'Craft a unique floral story, petal by petal.' : 
+             customType === 'keychain' ? 'Design a miniature masterpiece to carry with you.' : 
+             'Create a carrier that reflects your personal style.'}
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Preview Panel */}
@@ -153,69 +240,50 @@ export default function Customizer() {
               </div>
               
               <div className="aspect-square bg-pink-50/50 rounded-[2.5rem] mb-8 flex items-center justify-center relative overflow-hidden group">
-                {/* Visual Representation (Bouquet Cluster) */}
-                <div className="relative w-full h-full flex items-center justify-center">
-                   {/* Wrapping Paper Base */}
-                   <div 
-                     className="absolute w-64 h-64 rounded-full blur-3xl opacity-20 transition-all duration-1000 animate-pulse"
-                     style={{ backgroundColor: selection.wrapping?.color || '#FFD1DC' }}
-                   />
-                   
-                   <div className="relative w-64 h-64 flex items-center justify-center">
-                     {/* Fillers (Bottom Layer) */}
-                     {selection.fillers.map((f, i) => (
-                       <img 
-                         key={`filler-${f.id}-${i}`}
-                         src={f.image}
-                         alt={f.name}
-                         className="absolute w-32 h-32 object-contain transition-all duration-700 animate-in fade-in zoom-in"
-                         style={{ 
-                           transform: `rotate(${i * (360 / Math.max(1, selection.fillers.length)) + 20}deg) translateY(-30px) rotate(-20deg)`,
-                           zIndex: 1,
-                           opacity: 0.9,
-                           mixBlendMode: 'multiply'
-                         }}
-                       />
-                     ))}
+                {customType === 'bouquet' && (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <div className="absolute w-64 h-64 rounded-full blur-3xl opacity-20 transition-all duration-1000 animate-pulse" style={{ backgroundColor: selection.wrapping?.color || '#FFD1DC' }} />
+                    <div className="relative w-64 h-64 flex items-center justify-center">
+                      {selection.fillers.map((f, i) => (
+                        <img key={i} src={f.image} className="absolute w-32 h-32 object-contain" style={{ transform: `rotate(${i * (360 / Math.max(1, selection.fillers.length)) + 20}deg) translateY(-30px)`, zIndex: 1 }} />
+                      ))}
+                      {selection.flowers.map((f, i) => (
+                        <img key={i} src={f.image} className="absolute w-40 h-40 object-contain" style={{ transform: `rotate(${i * (360 / Math.max(1, selection.flowers.length))}deg) translateY(-20px)`, zIndex: 10 + i }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                     {/* Flowers (Top Layer) */}
-                     {selection.flowers.map((f, i) => (
-                       <img 
-                         key={`flower-${f.id}-${i}`}
-                         src={f.image}
-                         alt={f.name}
-                         className="absolute w-40 h-40 object-contain transition-all duration-500 animate-in zoom-in slide-in-from-bottom-8"
-                         style={{ 
-                           transform: `rotate(${i * (360 / Math.max(1, selection.flowers.length))}deg) translateY(-20px) rotate(${-i * (360 / Math.max(1, selection.flowers.length))}deg) scale(${1 + (i % 3) * 0.1})`,
-                           zIndex: 10 + i,
-                           mixBlendMode: 'multiply'
-                         }}
-                       />
-                     ))}
+                {customType === 'keychain' && (
+                  <div className="relative flex flex-col items-center">
+                    <div className="text-8xl mb-4 animate-bounce">{selection.baseCharm?.icon || '🔑'}</div>
+                    <div className="flex gap-2">
+                      {selection.addons.map((a, i) => (
+                        <span key={i} className="text-3xl animate-in slide-in-from-top" style={{ animationDelay: `${i * 100}ms` }}>{a.icon}</span>
+                      ))}
+                      {selection.initial && <span className="text-4xl font-playfair font-bold text-blossom-pink">{selection.initial.name.split(' ')[1] || 'A'}</span>}
+                    </div>
+                  </div>
+                )}
 
-                     {/* Center Piece if empty */}
-                     {selection.flowers.length === 0 && selection.fillers.length === 0 && (
-                       <div className="flex flex-col items-center gap-4 text-charcoal-berry/20">
-                         <Flower2 size={64} strokeWidth={1} className="animate-bounce" />
-                         <p className="text-sm font-medium">Start picking your blooms</p>
-                       </div>
-                     )}
-                   </div>
-
-                   {/* Wrapping Ribbon/Cone Effect */}
-                   <div 
-                     className="absolute bottom-[-10%] w-64 h-64 transition-all duration-1000 rotate-45"
-                     style={{ 
-                        backgroundColor: selection.wrapping?.color || '#FFD1DC',
-                        opacity: 0.8,
-                        borderRadius: '0 50% 100% 50%',
-                        zIndex: 5,
-                        boxShadow: 'inset -20px -20px 50px rgba(0,0,0,0.1)'
-                     }}
-                   />
-                 </div>
+                {customType === 'bag' && (
+                  <div className="relative flex flex-col items-center">
+                    <div 
+                      className="w-48 h-48 rounded-[2rem] shadow-2xl relative"
+                      style={{ backgroundColor: selection.bagBase?.color || '#fff' }}
+                    >
+                      {selection.strap && (
+                        <div className="absolute top-[-20px] left-1/2 -translate-x-1/2 text-4xl">{selection.strap.icon}</div>
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center flex-wrap p-4 gap-2">
+                        {selection.decorations.map((d, i) => (
+                          <span key={i} className="text-2xl animate-in zoom-in">{d.icon}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
 
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
@@ -224,19 +292,7 @@ export default function Customizer() {
                     <p className="text-sm text-charcoal-berry/40">Hand-assembled with care</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-3xl font-bold text-blossom-pink">${calculateTotal()}</span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-pink-50">
-                  <div className="flex flex-wrap gap-2">
-                    {selection.flowers.length > 0 ? selection.flowers.map(f => (
-                      <span key={f.id} className="px-3 py-1 bg-pink-50 text-blossom-pink rounded-full text-xs font-bold">{f.name}</span>
-                    )) : <span className="text-xs text-charcoal-berry/30 italic">No flowers selected yet...</span>}
-                    {selection.fillers.map(f => (
-                      <span key={f.id} className="px-3 py-1 bg-sage-mist/10 text-sage-mist rounded-full text-xs font-bold">{f.name}</span>
-                    ))}
-                    <span className="px-3 py-1 bg-charcoal-berry/5 text-charcoal-berry/60 rounded-full text-xs font-bold">{selection.wrapping?.name}</span>
+                    <span className="text-3xl font-bold text-blossom-pink">{formatCurrency(calculateTotal())}</span>
                   </div>
                 </div>
               </div>
@@ -246,7 +302,6 @@ export default function Customizer() {
           {/* Controls Panel */}
           <div className="lg:col-span-7">
             <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-pink-50 min-h-[600px] flex flex-col">
-              {/* Stepper */}
               <div className="flex justify-between mb-12 relative">
                 <div className="absolute top-1/2 left-0 w-full h-0.5 bg-pink-50 -translate-y-1/2 z-0" />
                 {[1, 2, 3].map(s => (
@@ -263,161 +318,182 @@ export default function Customizer() {
               </div>
 
               <div className="flex-1">
-                {step === 1 && (
-                  <div className="animate-in slide-in-from-right-8 duration-500">
-                    <h2 className="text-2xl font-playfair font-bold mb-6 flex items-center gap-3">
-                      <Flower2 className="text-blossom-pink" /> 1. Select Your Flowers
-                    </h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {options.flowers.map(flower => (
-                        <button
-                          key={flower.id}
-                          onClick={() => toggleItem(flower, 'flowers')}
-                          className={`group p-6 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center gap-3 ${
-                            selection.flowers.find(f => f.id === flower.id)
-                            ? 'border-blossom-pink bg-pink-50/30'
-                            : 'border-pink-50 hover:border-pink-200 bg-white'
-                          }`}
-                        >
-                          {flower.image ? (
-                            <img src={flower.image} alt={flower.name} className="w-20 h-20 object-cover rounded-2xl mb-2 group-hover:scale-110 transition-transform duration-500" />
-                          ) : (
-                            <span className="text-4xl group-hover:scale-125 transition-transform mb-2">{flower.icon}</span>
-                          )}
-                          <span className="font-bold text-sm">{flower.name}</span>
-                          <span className="text-xs text-blossom-pink font-bold">+${flower.price}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                {/* Bouquet Steps */}
+                {customType === 'bouquet' && (
+                  <>
+                    {step === 1 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">1. Select Your Flowers</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {options.flowers.map(o => (
+                            <button key={o.id} onClick={() => toggleItem(o, 'flowers')} className={`p-6 rounded-[2rem] border-2 transition-all ${selection.flowers.find(f => f.id === o.id) ? 'border-blossom-pink bg-pink-50/30' : 'border-pink-50 bg-white'}`}>
+                              <img src={o.image} className="w-20 h-20 mx-auto mb-2" />
+                              <p className="font-bold text-sm">{o.name}</p>
+                              <p className="text-xs text-blossom-pink">+{formatCurrency(o.price)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {step === 2 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">2. Add Fillers</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {options.fillers.map(o => (
+                            <button key={o.id} onClick={() => toggleItem(o, 'fillers')} className={`p-6 rounded-[2rem] border-2 transition-all ${selection.fillers.find(f => f.id === o.id) ? 'border-sage-mist bg-sage-mist/5' : 'border-pink-50 bg-white'}`}>
+                              <img src={o.image} className="w-20 h-20 mx-auto mb-2" />
+                              <p className="font-bold text-sm">{o.name}</p>
+                              <p className="text-xs text-sage-mist">+{formatCurrency(o.price)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {step === 3 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">3. Choose Wrapping</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                          {options.wrappings.map(o => (
+                            <button key={o.id} onClick={() => setSelection({...selection, wrapping: o})} className={`p-6 rounded-[2rem] border-2 transition-all flex items-center gap-4 ${selection.wrapping?.id === o.id ? 'border-charcoal-berry bg-charcoal-berry/5' : 'border-pink-50 bg-white'}`}>
+                              <div className="w-12 h-12 rounded-full shadow-inner" style={{ backgroundColor: o.color }} />
+                              <div className="text-left">
+                                <p className="font-bold text-sm">{o.name}</p>
+                                <p className="text-xs text-charcoal-berry/40">+{formatCurrency(o.price)}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {step === 2 && (
-                  <div className="animate-in slide-in-from-right-8 duration-500">
-                    <h2 className="text-2xl font-playfair font-bold mb-6 flex items-center gap-3">
-                      <Scissors className="text-sage-mist" /> 2. Add Fillers & Greenery
-                    </h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {options.fillers.map(filler => (
-                        <button
-                          key={filler.id}
-                          onClick={() => toggleItem(filler, 'fillers')}
-                          className={`group p-6 rounded-[2rem] border-2 transition-all duration-300 flex flex-col items-center gap-3 ${
-                            selection.fillers.find(f => f.id === filler.id)
-                            ? 'border-sage-mist bg-sage-mist/5'
-                            : 'border-pink-50 hover:border-sage-mist/30 bg-white'
-                          }`}
-                        >
-                          {filler.image ? (
-                            <img src={filler.image} alt={filler.name} className="w-20 h-20 object-cover rounded-2xl mb-2 group-hover:rotate-6 transition-transform duration-500" />
-                          ) : (
-                            <span className="text-4xl group-hover:rotate-12 transition-transform mb-2">{filler.icon}</span>
-                          )}
-                          <span className="font-bold text-sm">{filler.name}</span>
-                          <span className="text-xs text-sage-mist font-bold">+${filler.price}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                {/* Keychain Steps */}
+                {customType === 'keychain' && (
+                  <>
+                    {step === 1 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">1. Pick Base Charm</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {options.charms.map(o => (
+                            <button key={o.id} onClick={() => setSelection({...selection, baseCharm: o})} className={`p-8 rounded-[2rem] border-2 transition-all ${selection.baseCharm?.id === o.id ? 'border-blue-400 bg-blue-50' : 'border-pink-50 bg-white'}`}>
+                              <span className="text-5xl block mb-2">{o.icon}</span>
+                              <p className="font-bold text-sm">{o.name}</p>
+                              <p className="text-xs text-blue-500">+{formatCurrency(o.price)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {step === 2 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">2. Add Extra Charms & Beads</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {[...options.beads, ...options.tassels].map(o => (
+                            <button key={o.id} onClick={() => toggleItem(o, 'addons')} className={`p-6 rounded-[2rem] border-2 transition-all ${selection.addons.find(a => a.id === o.id) ? 'border-blue-400 bg-blue-50' : 'border-pink-50 bg-white'}`}>
+                              <span className="text-4xl block mb-2">{o.icon}</span>
+                              <p className="font-bold text-sm">{o.name}</p>
+                              <p className="text-xs text-blue-500">+{formatCurrency(o.price)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {step === 3 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">3. Add Your Initial</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                          {options.initials.map(o => (
+                            <button key={o.id} onClick={() => setSelection({...selection, initial: o})} className={`p-6 rounded-[2rem] border-2 transition-all flex items-center gap-4 ${selection.initial?.id === o.id ? 'border-charcoal-berry bg-charcoal-berry/5' : 'border-pink-50 bg-white'}`}>
+                              <span className="text-4xl">{o.icon}</span>
+                              <div className="text-left">
+                                <p className="font-bold text-sm">{o.name}</p>
+                                <p className="text-xs text-charcoal-berry/40">+{formatCurrency(o.price)}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {step === 3 && (
-                  <div className="animate-in slide-in-from-right-8 duration-500">
-                    <h2 className="text-2xl font-playfair font-bold mb-6 flex items-center gap-3">
-                      <Paintbrush2 className="text-charcoal-berry/40" /> 3. Choose Wrapping Paper
-                    </h2>
-                    <div className="grid grid-cols-2 gap-4">
-                      {options.wrappings.map(wrap => (
-                        <button
-                          key={wrap.id}
-                          onClick={() => setSelection({...selection, wrapping: wrap})}
-                          className={`group p-6 rounded-[2rem] border-2 transition-all duration-300 flex items-center gap-6 ${
-                            selection.wrapping?.id === wrap.id
-                            ? 'border-charcoal-berry bg-charcoal-berry/5'
-                            : 'border-pink-50 hover:border-pink-200 bg-white'
-                          }`}
-                        >
-                          <div className="w-12 h-12 rounded-full shadow-inner border-2 border-white" style={{ backgroundColor: wrap.color || '#ccc' }} />
-                          <div className="text-left">
-                            <p className="font-bold text-sm">{wrap.name}</p>
-                            <p className="text-xs text-charcoal-berry/40">{wrap.price === 0 ? 'Free' : `+$${wrap.price}`}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                {/* Bag Steps */}
+                {customType === 'bag' && (
+                  <>
+                    {step === 1 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">1. Bag Color</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                          {options.bag_colors.map(o => (
+                            <button key={o.id} onClick={() => setSelection({...selection, bagBase: o})} className={`p-6 rounded-[2rem] border-2 transition-all flex items-center gap-4 ${selection.bagBase?.id === o.id ? 'border-sage-mist bg-sage-mist/5' : 'border-pink-50 bg-white'}`}>
+                              <div className="w-16 h-16 rounded-2xl shadow-lg" style={{ backgroundColor: o.color }} />
+                              <div className="text-left">
+                                <p className="font-bold text-sm">{o.name}</p>
+                                <p className="text-xs text-sage-mist">+{formatCurrency(o.price)}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {step === 2 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">2. Choose Strap Style</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                          {options.straps.map(o => (
+                            <button key={o.id} onClick={() => setSelection({...selection, strap: o})} className={`p-6 rounded-[2rem] border-2 transition-all flex items-center gap-4 ${selection.strap?.id === o.id ? 'border-sage-mist bg-sage-mist/5' : 'border-pink-50 bg-white'}`}>
+                              <span className="text-4xl">{o.icon}</span>
+                              <div className="text-left">
+                                <p className="font-bold text-sm">{o.name}</p>
+                                <p className="text-xs text-sage-mist">+{formatCurrency(o.price)}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {step === 3 && (
+                      <div className="animate-in slide-in-from-right-8 duration-500">
+                        <h2 className="text-2xl font-playfair font-bold mb-6">3. Final Decorations</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          {options.bag_decors.map(o => (
+                            <button key={o.id} onClick={() => toggleItem(o, 'decorations')} className={`p-6 rounded-[2rem] border-2 transition-all ${selection.decorations.find(d => d.id === o.id) ? 'border-blossom-pink bg-pink-50/30' : 'border-pink-50 bg-white'}`}>
+                              <span className="text-4xl block mb-2">{o.icon}</span>
+                              <p className="font-bold text-sm">{o.name}</p>
+                              <p className="text-xs text-blossom-pink">+{formatCurrency(o.price)}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="mt-12 flex justify-between gap-4">
                 {step > 1 ? (
-                  <button 
-                    onClick={() => setStep(step - 1)}
-                    className="flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-charcoal-berry bg-pink-50 hover:bg-pink-100 transition-all"
-                  >
+                  <button onClick={() => setStep(step - 1)} className="flex items-center gap-2 px-8 py-4 rounded-2xl font-bold text-charcoal-berry bg-pink-50 hover:bg-pink-100 transition-all">
                     <ChevronLeft size={20} /> Back
                   </button>
                 ) : <div />}
 
                 {step < 3 ? (
-                  <button 
-                    onClick={() => setStep(step + 1)}
-                    className="flex items-center gap-2 px-8 py-4 rounded-2xl font-bold bg-blossom-pink text-white hover:shadow-lg transition-all"
-                  >
+                  <button onClick={() => setStep(step + 1)} className="flex items-center gap-2 px-8 py-4 rounded-2xl font-bold bg-blossom-pink text-white hover:shadow-lg transition-all">
                     Next Step <ChevronRight size={20} />
                   </button>
                 ) : (
                   <button 
                     onClick={handleAddToBag}
-                    disabled={selection.flowers.length === 0}
-                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all ${
-                      selection.flowers.length === 0 
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : isAdded 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-charcoal-berry text-white hover:bg-blossom-pink'
-                    }`}
+                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-bold transition-all ${isAdded ? 'bg-green-500 text-white' : 'bg-charcoal-berry text-white hover:bg-blossom-pink'}`}
                   >
-                    {isAdded ? 'Magically Added!' : (
-                      <>
-                        <ShoppingBag size={20} /> Add to Bag
-                      </>
-                    )}
+                    {isAdded ? 'Magically Added!' : <><ShoppingBag size={20} /> Add to Bag</>}
                   </button>
                 )}
               </div>
             </div>
           </div>
         </div>
-      </>
-        ) : (
-          <div className="bg-white rounded-[3rem] p-12 text-center shadow-xl border border-pink-50 animate-in fade-in zoom-in duration-500">
-            <div className="w-24 h-24 bg-pink-50 rounded-full flex items-center justify-center text-5xl mx-auto mb-6 shadow-inner">
-              {customType === 'keychain' ? '🔑' : customType === 'bag' ? '👜' : '✨'}
-            </div>
-            <h2 className="text-3xl font-playfair font-bold text-charcoal-berry mb-4">
-              Custom {customType.charAt(0).toUpperCase() + customType.slice(1)} Studio
-            </h2>
-            <p className="text-charcoal-berry/60 mb-8 max-w-md mx-auto">
-              Our artisan workshop is currently being prepared for custom {customType}s. 
-              Soon you'll be able to curate every detail of your {customType} with the same magic as our bouquets.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button 
-                onClick={() => setCustomType(null)}
-                className="px-8 py-4 bg-pink-50 text-charcoal-berry rounded-2xl font-bold hover:bg-pink-100 transition-all"
-              >
-                Go Back
-              </button>
-              <button 
-                onClick={() => setCustomType('bouquet')}
-                className="px-8 py-4 bg-blossom-pink text-white rounded-2xl font-bold hover:shadow-lg transition-all"
-              >
-                Build a Bouquet Instead
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { Heart, ShoppingBag, Trash2, Sparkles } from 'lucide-react';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { Link } from 'react-router-dom';
+import { formatCurrency } from '../utils/currency';
 
 export default function Wishlist() {
   const { wishlist, toggleWishlist } = useWishlist();
@@ -54,7 +55,7 @@ export default function Wishlist() {
                       <Trash2 size={18} />
                     </button>
                   </div>
-                  <p className="text-blossom-pink font-bold mt-1">${item.price}</p>
+                  <p className="text-blossom-pink font-bold mt-1">{formatCurrency(item.price)}</p>
                 </div>
                 
                 <button 

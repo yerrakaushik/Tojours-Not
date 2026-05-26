@@ -1,13 +1,23 @@
-import React from 'react';
-import { ShoppingBag, Heart, User, Menu, X, Truck, Package, ShieldCheck, Flower2, Sparkles } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { ShoppingBag, Heart, User, Menu, X, Search } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 
 export default function Navbar() {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { totalItems } = useCart();
   const { wishlist } = useWishlist();
+  const navigate = useNavigate();
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery)}`);
+      setSearchQuery('');
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-creamy-vanilla/90 backdrop-blur-md border-b border-pink-200 px-6 py-4">
@@ -27,6 +37,17 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
+          <form onSubmit={handleSearch} className="hidden md:flex relative group">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search blossoms..."
+              className="w-48 pl-10 pr-4 py-2 rounded-full border border-pink-100 bg-white/50 focus:w-64 focus:bg-white focus:ring-2 focus:ring-blossom-pink focus:border-transparent transition-all outline-none text-sm placeholder:text-gray-400"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blossom-pink transition-colors" size={16} />
+          </form>
+
           <Link to="/wishlist" className="p-2 hover:bg-pink-50 rounded-full transition-all hover:scale-110 text-charcoal-berry relative">
             <Heart size={22} className={wishlist.length > 0 ? 'fill-blossom-pink text-blossom-pink' : ''} />
             {wishlist.length > 0 && (
@@ -56,7 +77,17 @@ export default function Navbar() {
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 w-full bg-white border-b border-pink-100 p-6 flex flex-col gap-4 md:hidden animate-in slide-in-from-top duration-300">
+        <div className="absolute top-full left-0 w-full bg-white border-b border-pink-100 p-6 flex flex-col gap-4 md:hidden animate-in slide-in-from-top duration-300 shadow-xl">
+          <form onSubmit={handleSearch} className="relative mb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search blossoms..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-pink-100 bg-gray-50 focus:ring-2 focus:ring-blossom-pink outline-none text-sm"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          </form>
           <Link to="/" onClick={() => setIsOpen(false)} className="text-lg font-semibold p-2 hover:bg-pink-50 rounded-xl">Home</Link>
           <Link to="/shop" onClick={() => setIsOpen(false)} className="text-lg font-semibold p-2 hover:bg-pink-50 rounded-xl">Shop All</Link>
           <Link to="/customizer" onClick={() => setIsOpen(false)} className="text-lg font-semibold p-2 hover:bg-pink-50 rounded-xl">Custom</Link>
